@@ -36,10 +36,6 @@ server:
   # No global context-path; RasBackendWebConfig.configurePathMatch adds /ras-api,
   # /reconer, /x12er, /ras-analyzer prefixes at the controller dispatch level.
   servlet:
-    multipart:
-      enabled: true
-      max-file-size: 128MB
-      max-request-size: 128MB
     session:
       tracking-modes: cookie
   tomcat:
@@ -47,6 +43,16 @@ server:
     protocol_header: x-forwarded-proto
 
 spring:
+  # Multipart settings MUST sit under spring.servlet.multipart, NOT
+  # server.servlet.multipart — Spring Boot only reads the `spring.*` path.
+  # Defaults are 1MB max-file-size / 10MB max-request-size; without these
+  # overrides any upload >1MB (e.g. the Hamaspik member-cross-ref txt) fails
+  # at the multipart parser with "Maximum upload size exceeded".
+  servlet:
+    multipart:
+      enabled: true
+      max-file-size: 128MB
+      max-request-size: 128MB
   application:
     name: ${APP_NAME_WITH_INDEX:ras-backend}
     log:

@@ -34,8 +34,13 @@
                     <snapshots><enabled>true</enabled></snapshots>
                 </repository>
                 <repository>
-                    <id>github</id>
-                    <name>GitHub Packages</name>
+                    <!-- Cross-repo read of menacher/* packages (ras-api, reconer,
+                         x12er, ras-analyzer, ras-common, ras-tenant, ras-jooq).
+                         Matches the `github-read` <server> entry in the workflow's
+                         settings.xml — must NOT be `github`, which would have no
+                         matching credential entry and 401. -->
+                    <id>github-read</id>
+                    <name>GitHub Packages (cross-repo read)</name>
                     <url>https://maven.pkg.github.com/menacher/*</url>
                     <snapshots><enabled>true</enabled></snapshots>
                     <releases><enabled>true</enabled></releases>

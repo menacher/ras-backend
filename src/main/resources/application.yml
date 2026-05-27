@@ -1,0 +1,307 @@
+# ============================================================================
+# ras-backend — single Spring Boot process aggregating ras-api + reconer +
+# x12er + ras-analyzer. Each peer module is consumed as its library jar; their
+# original application.yml lives inside their lib jars but does not load here.
+# This file is the merged, authoritative config.
+# ============================================================================
+authz:
+  type: cognito
+  cors:
+    allowed-origins: http://localhost:4200, http://localhost:8080, https://edpsdemo.com
+    allowed-methods: GET, POST, PUT, PATCH, DELETE, OPTIONS
+    allowed-headers: Authorization, Content-Type
+    allow-credentials: true
+    max-age: 3600
+  auth:
+    jwt:
+      group-claim-name: "cognito:groups"
+  cognito:
+    user-pool-id: us-east-2_iobajgtWs
+    client-id: 7ov1h3tml7t3ah6t1kn0h7ekci
+    region: us-east-2
+    domain: rasapp.auth.us-east-2.amazoncognito.com
+
+logging:
+  level:
+    root: INFO
+    org.springframework.web: INFO
+    org.springframework.security: INFO
+  pattern:
+    correlation: "[${spring.application.name:},%X{traceId:-},%X{spanId:-}] "
+  include-application-name: false
+
+server:
+  port: 8080
+  forward-headers-strategy: native
+  # No global context-path; RasBackendWebConfig.configurePathMatch adds /ras-api,
+  # /reconer, /x12er, /ras-analyzer prefixes at the controller dispatch level.
+  servlet:
+    multipart:
+      enabled: true
+      max-file-size: 128MB
+      max-request-size: 128MB
+    session:
+      tracking-modes: cookie
+  tomcat:
+    remote_ip_header: x-forwarded-for
+    protocol_header: x-forwarded-proto
+
+spring:
+  application:
+    name: ${APP_NAME_WITH_INDEX:ras-backend}
+    log:
+      dir: ${APP_LOG_DIR:/data/log/ras-backend}
+  profiles:
+    # `bundled` activates the in-process clients
+    # (InProcessReconerClient / InProcessAnalyzerClient / InProcessX12erClient)
+    # and the RasBackendExternalRequestFilter that blocks external HTTP to
+    # /reconer/**, /x12er/**, /ras-analyzer/**. Additional profiles
+    # (e.g. hamaspik) can be appended via the SPRING_PROFILES_ACTIVE env var.
+    active: bundled
+  main:
+    # Each peer module ships its own MetricsConfig / AsyncConfig / etc. with
+    # @Bean methods that share names (timedAspect, taskExecutor, …). They are
+    # functionally equivalent infrastructure beans; we let later-scanned beans
+    # override earlier ones rather than refactor each module to namespace its
+    # bean methods. The DslConfig case is handled separately via excludeFilters
+    # in RasBackendApplication since those beans differ in behaviour.
+    allow-bean-definition-overriding: true
+  security:
+    oauth2:
+      resourceserver:
+        jwt:
+          issuer-uri: https://cognito-idp.us-east-2.amazonaws.com/us-east-2_iobajgtWs
+          jwk-set-uri: https://cognito-idp.us-east-2.amazonaws.com/us-east-2_iobajgtWs/.well-known/jwks.json
+  datasource:
+    name: postgres-datasource
+    url: ${POSTGRES_URL:jdbc:postgresql://localhost:5432/ras}?reWriteBatchedInserts=true&prepareThreshold=5&preparedStatementCacheQueries=2048&preparedStatementCacheSizeMiB=20
+    username: ${POSTGRES_USER:ras}
+    password: ${POSTGRES_PASSWORD:12345}
+    driver-class-name: org.postgresql.Driver
+    hikari:
+      minimumIdle: 2
+      maximum-pool-size: ${RAS_DB_POOL_SIZE:30}
+      max-lifetime: 500000
+      idleTimeout: 120000
+      auto-commit: false
+  cache:
+    cache-names: enc-status,enc-status-search
+    caffeine:
+      spec: maximumSize=250,expireAfterAccess=300s
+  jooq:
+    sql-dialect: postgres
+
+# ras-api specific
+ras-api:
+  scheduling:
+    enabled: true
+    submitted-expired:
+      enabled: false
+      cron: "0 30 2 * * *"
+      days-threshold: 14
+  hcc:
+    base-pmpm-usd: 1000.00
+
+# File paths shared between ras-api, reconer, ras-analyzer
+file:
+  data-root: ${DATA_DIR:/data}
+  plan-base-dir: ${DATA_DIR:/data}/<product>/<account>/<plan>
+  upload-dir: ${EDPS_PATH:/data/edps}/online_upload
+  csv-out: ${EDPS_PATH:/data/edps}/<account>/<plan>/csv
+  edps-plan-base-dir: ${EDPS_PATH:/data/edps}/<account>/<plan>
+  generated-file-dir: ${file.edps-plan-base-dir}/regular/generated
+  upload-dir-v2: ${file.edps-plan-base-dir}/online_upload
+  csv-report-out: ${file.edps-plan-base-dir}/csv/specialreport
+  invalid-dir: ${file.edps-plan-base-dir}/invalid
+  unlinked-csv-file: ${file.edps-plan-base-dir}/unlinked_csv
+  linked-batch-file: ${file.edps-plan-base-dir}/linked/to_be_processed
+  linked-batch-report: ${file.edps-plan-base-dir}/reports
+  supplemental-benefit-file: ${file.edps-plan-base-dir}/supplemental
+  rule-dir: ${file.edps-plan-base-dir}/edit
+  batchedX12CSVFilename: MAB.PROD.NDM.PROD.EDST
+  batch-data-file: ${file.edps-plan-base-dir}/batch/to_be_processed
+  batch-data-report: ${file.edps-plan-base-dir}/reports
+  history-file: ${file.edps-plan-base-dir}/history/to_be_processed
+  adjudicated-file: ${file.edps-plan-base-dir}/adjudicated/to_be_processed
+  state-837-file: ${file.edps-plan-base-dir}/state/to_be_processed
+  cms-file: ${file.edps-plan-base-dir}/cms/to_be_submitted
+  hicn-mbi-flow-folder: ${file.edps-plan-base-dir}/hicn_mbi/to_be_processed
+  state-nte-update-flow-folder: ${file.edps-plan-base-dir}/state_nte/to_be_processed/<flow>
+  raf-plan-base-dir: ${RAF_PATH:/data/raf}/<account>/<plan>
+  mmr-plan-base-dir: ${MMR_PATH:/data/mmr}/<account>/<plan>
+  modd-plan-base-dir: ${MODD_PATH:/data/modd}/<account>/<plan>
+  member-diag-support-file: ${file.edps-plan-base-dir}/member_diag_support_files
+
+ftp:
+  ftp-claim-csv-upload-dir: /data/edps/<account>/<plan>/ftp/default/claim_csv
+  ftp-linked-chart-upload-dir: /data/edps/<account>/<plan>/ftp/default/linked_chart
+  ftp-claim-history-upload-dir: /data/edps/<account>/<plan>/ftp/default/history
+  ftp-supplemental-benefit-upload-dir: /data/edps/<account>/<plan>/ftp/supplemental/default
+  ftp-unlinked-chart-upload-dir: /data/edps/<account>/<plan>/ftp/default/unlinked_csv
+  ftp-void-upload-dir: /data/edps/<account>/<plan>/ftp/default/void
+  ftp-hamaspik-membership-upload-dir: /data/edps/<account>/<plan>/ftp/default/membership
+  ftp-modd-upload-dir: /data/edps/<account>/<plan>/ftp/default/modd
+  ftp-sweep-output-dir: /data/edps/<account>/<plan>/ftp/sweep/output
+
+# Peer service URLs — in bundled mode all three resolve to localhost:8080 so
+# inter-service HTTP calls become loopback. Override via env vars for split deploy.
+py-ras:
+  server-host: ${PY_RAS_HOST:py-ras}
+  server-port: ${PY_RAS_PORT:3124}
+  apply-response-url: /applyresponse
+  ras-py-ras-base-dir: ${HOST_RAS_PY_RAS_BASE_DIR:/data/edps}
+  ras-loop-id-csv-input: ${HOST_RAS_LOOP_ID_CSV_INPUT:/data/py-ras/loop_csv_input}
+  history-load-url: /historyload
+
+reconer:
+  server-host: ${RECONER_HOST:localhost}
+  server-port: ${RECONER_PORT:8080}
+  reconer-reconcile-url: /reconer/reconcile
+  reconer-999-url: /reconer/reconcile/999
+  reconer-277-url: /reconer/reconcile/277
+  reconer-mao1-url: /reconer/reconcile/mao1
+  reconer-mao2-url: /reconer/reconcile/mao2
+  file-lister-url: /reconer/files
+  recent-files-url: /reconer/files/recent
+  received-files-url: /reconer/files/received
+  tracking-report-url: /reconer/files/tracking-report
+  batch-data-url: /reconer/batch-data
+  linked-cr-url: /reconer/batch-data/linked-cr
+
+analyzer:
+  server-host: ${ANALYZER_HOST:localhost}
+  server-port: ${ANALYZER_PORT:8080}
+  mmr-file-url: /mmr/file
+  load-mmr-file-url: /commands/load-mmr-file
+  load-hccengine-file-url: /commands/load-hccengine-file
+  load-mmr-url: /commands/load-mmr
+  load-hccengine-url: /commands/load-hccengine
+  raf-extract-url: /commands/raf-extract
+  raf-generate-raw-file-url: /raf/raw-file
+  raf-hcc-engine-out-file-process-url: /raf/hcc-engine-file
+  update-planmembers-url: /commands/update-planmembers
+  discover-activemembers-url: /commands/discover-activemembers
+  bid-and-rebates-url: /commands/bid-and-rebates
+  eligible-members-url: /raf/eligible-members
+  mmr-raf-url: /raf/mmr-raf
+  no-hcc-url: /raf/no-hcc
+  breakdown-url: /raf/breakdown
+  trending-url: /raf/trending
+  cap-vs-proj-url: /raf/cap-vs-proj
+  yearly-member-level-url: /raf/yearly-member-level
+  yearly-pcp-level-url: /raf/yearly-pcp-level
+  specific-member-url: /raf/specific-member
+  specific-member-icd-url: /raf/specific-member-icd
+  monthly-financial-summary-url: /payment/monthly-financial-summary
+  member-monthly-payment-url: /payment/member-monthly-payment
+
+x12er:
+  server-host: ${X12ER_HOST:localhost}
+  server-port: ${X12ER_PORT:8080}
+  x12file-url: /x12er/file
+  ntefile-url: /x12er/nte-file
+  x12out: ${EDPS_PATH:/data/edps}/<account>/<plan>/generated_x12
+  uiX12out: ${EDPS_PATH:/data/edps}/x12er/ui_generated
+  rule-version: ${X12ER_RULE_VERSION:2}
+
+# x12er-internal config (preserved from its standalone application.yml)
+aws-cloud:
+  account_id:
+    name: "DEFAULT_ACCOUNT"
+    plans: >
+      HX96X
+      HY96Y
+
+# reconer-internal config
+report:
+  batch-size: ${BATCH_FETCH_SIZE:1000}
+  submission-volume-report-schedule: 0 5 0 * * WED
+  submission-volume-report-path: /data/edps/<account>/<plan>/reports/submission-volume-report
+  inst-extract-report-schedule: 0 10 0 * * WED
+  inst-extract-report-path: /data/edps/<account>/<plan>/reports/extract-report
+  prof-extract-report-schedule: 0 10 1 * * WED
+  prof-extract-report-path: /data/edps/<account>/<plan>/reports/extract-report
+  internal-edit-duplicate-report-schedule: 0 20 3 * * WED
+  internal-edit-duplicate-report-path: /data/edps/<account>/<plan>/reports/internal-edit-duplicate-report
+  hicn-mbi-report-schedule: 0 25 3 * * WED
+  hicn-mbi-report-path: /data/edps/<account>/<plan>/reports/hicn-mbi-report
+  stuck-submission-report-schedule: "-"
+  stuck-submission-report-path: /data/edps/<account>/<plan>/reports/stuck-submission-report
+  stuck-submission-threshold-days: 30
+
+global-ticker:
+  ticker-name: ras
+  batch-size: 50000
+
+batch:
+  generate-batch-file-flag: ${GENERATE_BATCH_FILE_FLAG:true}
+  file-process-parallelism: ${FILE_PROCESS_PARALLELISM:5}
+  claim-parallelism: ${CLAIM_PARALLELISM:5}
+  claim-ids-partition-size: ${CLAIM_IDS_PARTITION_SIZE:100}
+  claim-as-json-batch-size: ${CLAIM_AS_JSON_BATCH_SIZE:100}
+  turn-off-claim-parallelism: ${TURN_OFF_CLAIM_PARALLELISM:false}
+  clone-adjudicated-claims: ${CLONE_ADJUDICATED_CLAIMS:true}
+  load-claim-as-json: ${LOAD_CLAIM_AS_JSON:false}
+  dos-mismatch-check: ${DOS_MISMATCH_CHECK:true}
+
+cms-edits:
+  institutional-edits-enabled: ${INSTITUTIONAL_EDITS_ENABLED:true}
+  professional-edits-enabled: ${PROFESSIONAL_EDITS_ENABLED:true}
+
+ras-ui:
+  server-host: ${UI_HOST:localhost}
+  server-port: ${UI_PORT:4200}
+  report-ui-download-url: /report-download
+  report-api-download-url: /ras-api/report
+
+management:
+  endpoints:
+    jmx:
+      exposure:
+        exclude: "*"
+    web:
+      exposure:
+        include: health,info,metrics,prometheus
+  endpoint:
+    health:
+      show-details: always
+    info:
+      enabled: true
+    prometheus:
+      enabled: true
+  info:
+    env: { enabled: true }
+    build: { enabled: true }
+    git:
+      enabled: true
+      mode: full
+    java: { enabled: true }
+    os: { enabled: true }
+  prometheus:
+    metrics:
+      export:
+        enabled: true
+  otlp:
+    metrics:
+      export:
+        url: ${OTEL_EXPORTER_OTLP_ENDPOINT:http://localhost:4318}/v1/metrics
+        step: 15s
+    tracing:
+      export:
+        endpoint: ${OTEL_EXPORTER_OTLP_ENDPOINT:http://localhost:4318}/v1/traces
+  tracing:
+    export:
+      enabled: ${TRACING_ENABLED:false}
+    sampling:
+      probability: ${TRACING_SAMPLING_PROBABILITY:1.0}
+    propagation:
+      type: w3c
+  metrics:
+    tags:
+      application: ${spring.application.name:ras-backend}
+      environment: ${spring.profiles.active:default}
+    distribution:
+      percentiles-histogram:
+        http.server.requests: true
+      percentiles:
+        http.server.requests: 0.5,0.9,0.95,0.99

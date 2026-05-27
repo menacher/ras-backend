@@ -1,0 +1,130 @@
+name: Build and deploy ras-backend to docker hub
+
+on:
+  push:
+    branches:
+      - deploy
+  workflow_dispatch:
+
+# Pulls the four peer module lib jars (ras-api, reconer, x12er, ras-analyzer)
+# straight from GitHub Packages — no more cross-repo checkouts. Each peer
+# module's own workflow publishes its lib + boot jars on push to its prod
+# branch (ras-api/x12er/ras-analyzer: `deploy`; reconer: `master`).
+#
+# Ordering caveat: if a developer pushes a peer module and ras-backend
+# concurrently, GitHub Actions runs them in parallel — ras-backend may grab
+# the previous snapshot of that peer. For SNAPSHOT versions Maven resolves
+# the latest published timestamp; for a guaranteed-fresh build either wait
+# for the peer's workflow to finish before triggering ras-backend, or
+# trigger ras-backend manually via workflow_dispatch afterwards.
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    # packages:read so the auto GITHUB_TOKEN can pull from THIS repo's
+    # packages if any are present; cross-repo reads of menacher/* packages
+    # use the PAT in GHA_MAVEN_PASSWORD. ras-backend itself doesn't publish
+    # to GitHub Packages (it's a deployable artifact, not a library), so
+    # packages:write isn't needed.
+    permissions:
+      contents: read
+      packages: read
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@v4
+        with:
+          java-version: '21'
+          distribution: 'zulu'
+
+      - name: Write Maven settings.xml with github-read PAT credentials
+        run: |
+          mkdir -p ~/.m2
+          cat > ~/.m2/settings.xml <<'EOF'
+          <?xml version="1.0" encoding="UTF-8"?>
+          <settings>
+            <servers>
+              <!-- Cross-repo read of menacher/* packages (ras-api, reconer,
+                   x12er, ras-analyzer, ras-common, ras-tenant, ras-jooq).
+                   Needs a PAT with read:packages. -->
+              <server>
+                <id>github-read</id>
+                <username>${env.GHA_MAVEN_USER}</username>
+                <password>${env.GHA_MAVEN_PASSWORD}</password>
+              </server>
+            </servers>
+            <!-- Repository definitions ALSO live here (not just in the pom's
+                 github profile) so they are active BEFORE Maven resolves the
+                 <parent> ras-common. The pom's github profile can't activate
+                 until the pom has loaded, which itself needs the parent — so
+                 the parent must be findable from settings.xml-defined repos. -->
+            <profiles>
+              <profile>
+                <id>github-read</id>
+                <repositories>
+                  <repository>
+                    <id>central</id>
+                    <url>https://repo1.maven.org/maven2</url>
+                    <releases><enabled>true</enabled></releases>
+                    <snapshots><enabled>true</enabled></snapshots>
+                  </repository>
+                  <repository>
+                    <id>github-read</id>
+                    <url>https://maven.pkg.github.com/menacher/*</url>
+                    <releases><enabled>true</enabled></releases>
+                    <snapshots><enabled>true</enabled></snapshots>
+                  </repository>
+                </repositories>
+              </profile>
+            </profiles>
+            <activeProfiles>
+              <activeProfile>github-read</activeProfile>
+            </activeProfiles>
+          </settings>
+          EOF
+
+      - name: Cache Maven libs
+        uses: actions/cache@v4
+        with:
+          path: ~/.m2/repository
+          key: ${{ runner.os }}-maven-ras-backend-${{ hashFiles('**/pom.xml') }}
+          restore-keys: |
+            ${{ runner.os }}-maven-ras-backend-
+            ${{ runner.os }}-maven-
+
+      - name: Build ras-backend fat jar
+        # -U forces Maven to check remote for SNAPSHOT updates instead of
+        # trusting the (potentially stale) cached copy from a prior run.
+        # Otherwise the build silently grabs whatever snapshot landed in the
+        # m2 cache on the last CI run, defeating the point of pulling from
+        # GH Packages.
+        env:
+          GHA_MAVEN_USER: ${{ secrets.GHA_MAVEN_USER }}
+          GHA_MAVEN_PASSWORD: ${{ secrets.GHA_MAVEN_PASSWORD }}
+        run: mvn -B -Pgithub -U package -DskipTests
+
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Login to DockerHub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKER_HUB_USER }}
+          password: ${{ secrets.DOCKER_HUB_GHA_TOKEN }}
+
+      - name: Build and push ras-backend image
+        id: ras_backend_docker_build
+        uses: docker/build-push-action@v5
+        with:
+          context: ./
+          file: ./Dockerfile
+          platforms: linux/amd64,linux/arm64
+          push: true
+          tags: menacher/ras:ras-backend
+
+      - name: Image digest
+        run: echo ${{ steps.ras_backend_docker_build.outputs.digest }}

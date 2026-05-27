@@ -1,0 +1,37 @@
+# Hamaspik-specific overlay for ras-backend local development.
+# Mirrors ras-api/src/main/resources/application-hamaspik.yml; adjust as the
+# canonical file evolves.
+authz:
+  cors:
+    allowed-origins: http://localhost:4200, http://localhost:8080, https://eds.hamaspikchoice.org
+    allowed-methods: GET, POST, PUT, PATCH, DELETE, OPTIONS
+    allowed-headers: Authorization, Content-Type
+    allow-credentials: true
+    max-age: 3600
+ras-api:
+  scheduling:
+    submitted-expired:
+      enabled: true
+report:
+  submission-volume-report-schedule: 0 5 0 * * MON,WED
+  submission-volume-report-path: /mnt/c/ras/report_output/submission-volume-report
+  inst-extract-report-schedule: 0 10 0 * * *
+  inst-extract-report-path: /mnt/c/ras/report_output/extract-report
+  prof-extract-report-schedule: 0 10 1 * * *
+  prof-extract-report-path: /mnt/c/ras/report_output/extract-report
+  internal-edit-duplicate-report-schedule: 0 20 3 * * MON,WED
+  internal-edit-duplicate-report-path: /mnt/c/ras/report_output/internal-edit-duplicate-report
+  hicn-mbi-report-schedule: 0 25 3 * * MON,WED
+  hicn-mbi-report-path: /mnt/c/ras/report_output/hicn-mbi-report
+  stuck-submission-report-schedule: 0 0 4 * * *
+  stuck-submission-report-path: /mnt/c/ras/report_output/stuck-submission-report
+  stuck-submission-threshold-days: 30
+ftp:
+  ftp-claim-csv-upload-dir: /mnt/c/ras/ftp/claim_csv
+  ftp-linked-chart-upload-dir: /mnt/c/ras/ftp/linked_chart
+  ftp-claim-history-upload-dir: /mnt/c/ras/ftp/history
+  ftp-supplemental-benefit-upload-dir: /mnt/c/ras/ftp/supplemental/ASH,/mnt/c/ras/ftp/supplemental/Incomm,/mnt/c/ras/ftp/supplemental/CARELON
+  ftp-void-upload-dir: /mnt/c/ras/ftp/void
+  ftp-hamaspik-membership-upload-dir: /mnt/c/ras/ftp/membership
+  ftp-modd-upload-dir: /mnt/c/ras/ftp/modd
+  ftp-sweep-output-dir: /mnt/c/ras/ftp/sweep/output

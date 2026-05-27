@@ -1,0 +1,44 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Authoritative logback config for ras-backend. Each peer module's lib jar
+  ships its own logback-spring.xml (CONSOLE/ROLLING_FILE/AUDIT_FILE/OTEL etc.),
+  but in the ras-backend fat jar BOOT-INF/classes wins over BOOT-INF/lib so this
+  file is the one that loads.
+
+  Writes to BOTH the console (so IntelliJ / docker logs see it) AND a rolling
+  file at ${appLogDir}/ras-backend.log. appLogDir resolves from the spring
+  property spring.application.log.dir which application.yml binds to the
+  APP_LOG_DIR env var (default /data/log/ras-backend).
+-->
+<configuration>
+    <include resource="org/springframework/boot/logging/logback/defaults.xml"/>
+    <include resource="org/springframework/boot/logging/logback/console-appender.xml"/>
+
+    <springProperty scope="context" name="springAppName" source="spring.application.name" defaultValue="ras-backend"/>
+    <springProperty scope="context" name="appLogDir"    source="spring.application.log.dir" defaultValue="/data/log/ras-backend"/>
+
+    <appender name="ROLLING_FILE" class="ch.qos.logback.core.rolling.RollingFileAppender">
+        <file>${appLogDir}/ras-backend.log</file>
+        <append>true</append>
+        <encoder>
+            <pattern>%d{yyyy-MM-dd'T'HH:mm:ss.SSSXXX} %5p ${PID:-} --- [%15.15t] [%X{springAppName:-},%X{traceId:-},%X{spanId:-}] %-40.40logger{39} : %m%n%wEx</pattern>
+        </encoder>
+        <rollingPolicy class="ch.qos.logback.core.rolling.SizeAndTimeBasedRollingPolicy">
+            <!-- SizeAndTimeBasedRollingPolicy is the policy that supports both
+                 daily roll-over (%d) AND size-based roll-over within a day (%i).
+                 The earlier TimeBasedRollingPolicy rejects %i / maxFileSize. -->
+            <fileNamePattern>${appLogDir}/ras-backend.%d{yyyy-MM-dd}.%i.log.gz</fileNamePattern>
+            <maxFileSize>100MB</maxFileSize>
+            <maxHistory>14</maxHistory>
+            <totalSizeCap>5GB</totalSizeCap>
+        </rollingPolicy>
+    </appender>
+
+    <root level="INFO">
+        <appender-ref ref="CONSOLE"/>
+        <appender-ref ref="ROLLING_FILE"/>
+    </root>
+
+    <logger name="org.springframework.web" level="INFO"/>
+    <logger name="org.springframework.security" level="INFO"/>
+</configuration>

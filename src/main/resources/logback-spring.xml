@@ -57,9 +57,9 @@
     <!-- Tenant-binding audit trail. The interceptor moved from
          com.fianzahealth.rasapi.config.TenantInterceptor into ras-common
          (RAPI-1476); set it to DEBUG so the "Bound tenant=..." line is emitted.
-         Default additivity propagates it to the root appenders (console +
-         ras-backend.log) and AUDIT_FILE persists it separately. -->
-    <logger name="com.fianzahealth.ras.tenant.TenantInterceptor" level="DEBUG">
+         Keep additivity disabled so audit entries stay out of console +
+         ras-backend.log and are persisted only in AUDIT_FILE. -->
+    <logger name="com.fianzahealth.ras.tenant.TenantInterceptor" level="DEBUG" additivity="false">
         <appender-ref ref="AUDIT_FILE"/>
     </logger>
 </configuration>

@@ -151,13 +151,11 @@ ftp:
 
 # Peer service URLs — in bundled mode all three resolve to localhost:8080 so
 # inter-service HTTP calls become loopback. Override via env vars for split deploy.
+# py-ras communicates via the inter_process_queue table (no HTTP endpoint);
+# only the per-plan directory roots it reads/writes are configured here.
 py-ras:
-  server-host: ${PY_RAS_HOST:py-ras}
-  server-port: ${PY_RAS_PORT:3124}
-  apply-response-url: /applyresponse
   ras-py-ras-base-dir: ${HOST_RAS_PY_RAS_BASE_DIR:/data/edps}
   ras-loop-id-csv-input: ${HOST_RAS_LOOP_ID_CSV_INPUT:/data/py-ras/loop_csv_input}
-  history-load-url: /historyload
 
 reconer:
   server-host: ${RECONER_HOST:localhost}

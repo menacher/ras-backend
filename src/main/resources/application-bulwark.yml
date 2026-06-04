@@ -1,0 +1,20 @@
+# Bulwark environment overlay for ras-backend (https://submissions.gcp.dev.bulwark.health).
+# Activated at deploy time with SPRING_PROFILES_ACTIVE=bundled,bulwark.
+#
+# Moves BOTH Cognito locations the backend reads off the image default pool
+# (us-east-2_iobajgtWs) onto the UI's pool (us-east-2_LnQ3AM9Y7), so UI-issued
+# tokens validate. Mirrors the application-hamaspik.yml overlay pattern.
+authz:
+  cors:
+    allowed-origins: https://submissions.gcp.dev.bulwark.health, http://localhost:4200
+  cognito:
+    user-pool-id: us-east-2_LnQ3AM9Y7
+    client-id: oja8vamk2bls0eg2hlrvoolgg
+    region: us-east-2
+spring:
+  security:
+    oauth2:
+      resourceserver:
+        jwt:
+          issuer-uri: https://cognito-idp.us-east-2.amazonaws.com/us-east-2_LnQ3AM9Y7
+          jwk-set-uri: https://cognito-idp.us-east-2.amazonaws.com/us-east-2_LnQ3AM9Y7/.well-known/jwks.json

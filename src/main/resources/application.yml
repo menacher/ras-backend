@@ -147,6 +147,7 @@ ftp:
   ftp-void-upload-dir: /data/edps/<account>/<plan>/ftp/default/void
   ftp-hamaspik-membership-upload-dir: /data/edps/<account>/<plan>/ftp/default/membership
   ftp-modd-upload-dir: /data/edps/<account>/<plan>/ftp/default/modd
+  ftp-mmr-upload-dir: /data/edps/<account>/<plan>/ftp/default/mmr
   ftp-sweep-output-dir: /data/edps/<account>/<plan>/ftp/sweep/output
 
 # Peer service URLs — in bundled mode all three resolve to localhost:8080 so

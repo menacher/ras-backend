@@ -34,4 +34,5 @@ ftp:
   ftp-void-upload-dir: /mnt/c/ras/ftp/void
   ftp-hamaspik-membership-upload-dir: /mnt/c/ras/ftp/membership
   ftp-modd-upload-dir: /mnt/c/ras/ftp/modd
+  ftp-mmr-upload-dir: /mnt/c/ras/ftp/mmr
   ftp-sweep-output-dir: /mnt/c/ras/ftp/sweep/output

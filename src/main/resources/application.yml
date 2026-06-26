@@ -53,6 +53,11 @@ spring:
       enabled: true
       max-file-size: 128MB
       max-request-size: 128MB
+  mvc:
+    servlet:
+      # Eagerly initialize the DispatcherServlet during context refresh instead of
+      # lazily on the first inbound HTTP request (Spring Boot default = -1).
+      load-on-startup: 1
   application:
     name: ${APP_NAME_WITH_INDEX:ras-backend}
     log:

@@ -95,6 +95,12 @@ spring:
       max-lifetime: 500000
       idleTimeout: 120000
       auto-commit: false
+      # RAF perf (design v2 Phase 0): PostgreSQL 12 trips LLVM JIT on the heavy
+      # claims_for_raf_by_year.sql extract on every execution. Measured A/B on the
+      # 43-gen RAF workload: makespan 1076s (jit=on) -> 639s (jit=off), ~10x on the
+      # median query. jit gives no benefit to the rest of the RAS OLTP workload, so
+      # disable it connection-wide on the shared bundle datasource.
+      connection-init-sql: SET jit=off
   cache:
     cache-names: enc-status,enc-status-search
     caffeine:

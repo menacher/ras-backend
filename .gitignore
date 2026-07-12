@@ -48,3 +48,4 @@ appLogDir_IS_UNDEFINED
 
 ### macOS ###
 .DS_Store
+pom.xml.versionsBackup

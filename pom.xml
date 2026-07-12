@@ -13,7 +13,7 @@
 
     <groupId>com.fianzahealth.ras</groupId>
     <artifactId>ras-backend</artifactId>
-    <version>1.7-SNAPSHOT</version>
+    <version>1.8-SNAPSHOT</version>
     <name>ras-backend</name>
     <description>Aggregator that runs ras-api + reconer + x12er + ras-analyzer in a
         single Spring Boot process. Each peer module is consumed as a library jar.
@@ -54,22 +54,22 @@
         <dependency>
             <groupId>com.fianzahealth</groupId>
             <artifactId>ras-api</artifactId>
-            <version>1.7-SNAPSHOT</version>
+            <version>1.8-SNAPSHOT</version>
         </dependency>
         <dependency>
             <groupId>com.fianzahealth.ras</groupId>
             <artifactId>reconer</artifactId>
-            <version>1.7-SNAPSHOT</version>
+            <version>1.8-SNAPSHOT</version>
         </dependency>
         <dependency>
             <groupId>com.fianzahealth</groupId>
             <artifactId>x12er</artifactId>
-            <version>1.7-SNAPSHOT</version>
+            <version>1.8-SNAPSHOT</version>
         </dependency>
         <dependency>
             <groupId>com.medvand</groupId>
             <artifactId>ras-analyzer</artifactId>
-            <version>1.7-SNAPSHOT</version>
+            <version>1.8-SNAPSHOT</version>
         </dependency>
 
         <!-- Shared tenant infrastructure (transitively present via the peer

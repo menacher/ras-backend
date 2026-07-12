@@ -105,13 +105,30 @@ spring:
 # ras-api specific
 ras-api:
   scheduling:
-    enabled: true
+    # Single bundle-wide scheduling kill-switch: @EnableScheduling is context-global, so BOTH
+    # this gate and ras-analyzer's (below) must be off to disable @Scheduled processing in the
+    # bundle. RAS_SCHEDULING_ENABLED=false turns off all background work (flow engine, FTP
+    # pollers, report crons, analyzer crons) — the pattern for running extra HTTP-only replicas
+    # while exactly one instance keeps the default (true) and owns the scheduled work.
+    enabled: ${RAS_SCHEDULING_ENABLED:true}
     submitted-expired:
       enabled: false
       cron: "0 30 2 * * *"
       days-threshold: 14
+  flow:
+    # Crash recovery: in_process_flows claims older than this are released by the reaper so the
+    # flow item becomes claimable again. Must exceed the longest legitimate step execution.
+    stale-claim-timeout-minutes: 120
+  # DB-backed (ShedLock) per-file lock between the ApplyResponseTask cron and the
+  # ADJUDICATED_FILE_RECONCILE flow step; self-expires after this if the holder crashes.
+  file-processing-lock-at-most-for: PT30M
   hcc:
     base-pmpm-usd: 1000.00
+
+# ras-analyzer's half of the bundle-wide scheduling kill-switch (see ras-api.scheduling.enabled).
+ras-analyzer:
+  scheduling:
+    enabled: ${RAS_SCHEDULING_ENABLED:true}
 
 # File paths shared between ras-api, reconer, ras-analyzer
 file:

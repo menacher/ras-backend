@@ -116,12 +116,10 @@ ras-api:
       cron: "0 30 2 * * *"
       days-threshold: 14
   flow:
-    # Crash recovery: in_process_flows claims older than this are released by the reaper so the
-    # flow item becomes claimable again. Must exceed the longest legitimate step execution.
-    stale-claim-timeout-minutes: 120
-  # DB-backed (ShedLock) per-file lock between the ApplyResponseTask cron and the
-  # ADJUDICATED_FILE_RECONCILE flow step; self-expires after this if the holder crashes.
-  file-processing-lock-at-most-for: PT30M
+    # Crash recovery: in_process_flows claims whose owner's heartbeat (60s, per instance) has
+    # been silent for this long are released by the reaper. Live workers are never reaped
+    # regardless of step runtime.
+    stale-claim-timeout-minutes: 15
   hcc:
     base-pmpm-usd: 1000.00
 

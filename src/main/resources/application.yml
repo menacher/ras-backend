@@ -30,6 +30,34 @@ logging:
     correlation: "[${spring.application.name:},%X{traceId:-},%X{spanId:-}] "
   include-application-name: false
 
+# Email V3 D2: the mail-owning JVM is per-environment — EXACTLY ONE JVM per env may have a real
+# provider. Single-bundle installs (hamaspik: this jar is the only JVM) set EMAIL_PROVIDER=ses
+# HERE; in a split install (standalone ras-api + this bundle) set it on ras-api only and leave
+# this unset. The hazard when two JVMs go live is double-ENQUEUE (the producer crons run in both
+# and write two outbox rows) — the drain itself claims rows with FOR UPDATE SKIP LOCKED and is
+# safe. Same env-var contract as ras-api/application.yml; AWS creds come from the SDK default
+# chain (AWS_ACCESS_KEY_ID / AWS_SECRET_ACCESS_KEY env), never from properties.
+ras:
+  email:
+    provider: ${EMAIL_PROVIDER:noop}                     # ses | smtp | noop
+    from: ${EMAIL_FROM:reports@notifications.confianzatech.com}
+    from-display-name: ${EMAIL_FROM_NAME:RAS Platform}
+    public-base-url: ${EMAIL_PUBLIC_BASE_URL:}           # portal base for report deep links
+    digest-recipients: ${EMAIL_DIGEST_RECIPIENTS:}       # comma-separated; empty => digests do nothing
+    ses:                                                 # only consulted when provider=ses
+      region: ${SES_REGION:us-east-2}
+      configuration-set: ${SES_CONFIGURATION_SET:ras-notifications}
+    smtp:                                                # only consulted when provider=smtp
+      host: ${SMTP_HOST:}
+      port: ${SMTP_PORT:587}
+      username: ${SMTP_USER:}
+      password: ${SMTP_PASS:}
+      starttls: true
+    digest:
+      enabled: ${EMAIL_DIGESTS_ENABLED:false}
+      payment-year: ${EMAIL_DIGEST_PAYMENT_YEAR:}
+      model-run: ${EMAIL_DIGEST_MODEL_RUN:INITIAL}
+
 server:
   port: 8080
   forward-headers-strategy: native

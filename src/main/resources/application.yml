@@ -43,7 +43,8 @@ ras:
     from: ${EMAIL_FROM:reports@notifications.confianzatech.com}
     from-display-name: ${EMAIL_FROM_NAME:RAS Platform}
     public-base-url: ${EMAIL_PUBLIC_BASE_URL:}           # portal base for report deep links
-    digest-recipients: ${EMAIL_DIGEST_RECIPIENTS:}       # comma-separated; empty => digests do nothing
+    recipient-fallback-enabled: ${EMAIL_RECIPIENT_FALLBACK_ENABLED:false}
+    digest-recipients: ${EMAIL_DIGEST_RECIPIENTS:}       # optional bootstrap fallback only
     ses:                                                 # only consulted when provider=ses
       region: ${SES_REGION:us-east-2}
       configuration-set: ${SES_CONFIGURATION_SET:ras-notifications}

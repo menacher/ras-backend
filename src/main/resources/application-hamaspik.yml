@@ -8,6 +8,13 @@ authz:
     allowed-headers: Authorization, Content-Type
     allow-credentials: true
     max-age: 3600
+# RAPI-1594: hamaspik sends from the apex confianzatech.com identity, not the
+# platform default notifications.confianzatech.com. A deploy-time EMAIL_FROM env
+# var still overrides this (SESv2 authorizes the ras-ses-send policy against the
+# confianzatech.com identity ARN).
+ras:
+  email:
+    from: ${EMAIL_FROM:reports@confianzatech.com}
 ras-api:
   scheduling:
     submitted-expired:

@@ -41,7 +41,7 @@ ras:
   email:
     provider: ${EMAIL_PROVIDER:noop}                     # ses | smtp | noop
     from: ${EMAIL_FROM:reports@notifications.confianzatech.com}
-    from-display-name: ${EMAIL_FROM_NAME:RAS Platform}
+    from-display-name: ${EMAIL_FROM_NAME:EDS RAS Platform}
     public-base-url: ${EMAIL_PUBLIC_BASE_URL:}           # portal base for report deep links
     recipient-fallback-enabled: ${EMAIL_RECIPIENT_FALLBACK_ENABLED:false}
     digest-recipients: ${EMAIL_DIGEST_RECIPIENTS:}       # optional bootstrap fallback only

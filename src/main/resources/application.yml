@@ -283,6 +283,65 @@ report:
   stuck-submission-report-path: /data/edps/<account>/<plan>/reports/stuck-submission-report
   stuck-submission-threshold-days: 30
 
+# ---------------------------------------------------------------------------
+# HCC Coding Workbench (com.fianzahealth.coding).
+#
+# Off by DEFAULT, on per tenant. With no override the /coding endpoints 403
+# and no sync ever runs, so the module is inert on installs that have not
+# adopted it; `tenants` below names the ones that have.
+#
+# The config is only half the switch. A tenant also needs the Cognito groups
+# RAS_CODING / RAS_CODING_ADMIN to exist and be granted -- enabled here without
+# them gets a visible module whose approvals and QA writes all 403.
+#
+# Everything below is a tunable. The case state machine deliberately is NOT
+# one: transition legality lives in code so a case's history can never be
+# explained by "that move was legal back in March".
+# ---------------------------------------------------------------------------
+coding:
+  # Deployment default. One install serves several plans, so enabling the module
+  # globally to reach one of them would start building case inventory -- and firing
+  # sync passes on every batch completion -- for plans that never asked for it.
+  enabled: true
+  # Per-tenant overrides, keyed by SCHEMA name (lower case) -- schema IS plan identity here.
+  #
+  # `public` is on: every account's own plan runs in the public schema (hx96x on the default
+  # account, H0034 on hamaspik), so this is how the workbench reaches the plan an install was
+  # built for. Note what that means -- it is a blanket enable for the primary plan of every
+  # deployment that reads this file, not a single pilot. The per-account profiles can still name
+  # additional schemas; application-hamaspik.yml restates `public: true` for the same plan.
+  #
+  # Deliberately NOT `enabled: true`. Add a second plan to an account and it arrives in its OWN
+  # schema (h48869, ...), which no key here reaches -- so the new plan falls back to the
+  # deployment default and stays dark until someone names it. That is the wanted behaviour: an
+  # additional plan starts accruing case inventory when it is asked to, not when it is created.
+  #
+  # An override can only turn a tenant ON. To take `public` back off, this line is the only place
+  # to change -- a profile cannot override it back to false.
+  tenants:
+    public: true
+  # Payment years the sync considers, counting back from the current year.
+  sync-years-back: 2
+  # Also build cases for PY N+1. On by default: next year's payment year accrues
+  # diagnoses from this year's dates of service long before CMS pays on them, and
+  # it is the year a coder can still influence.
+  sync-future-year: true
+  # Fallback PMPM when a member's PBP has no plan_rate row. Matches the HCC
+  # dashboard's est-impact convention.
+  default-base-pmpm-usd: 1000
+  # Days after the FINAL sweep before open cases auto-close as window-closed.
+  window-closed-grace-days: 7
+  # How often to look for sync requests nobody ran. Two things leave one pending with
+  # no runner: a trigger that loses the advisory lock after the holder's last check,
+  # and a drain that hits its pass cap. Both are fixed by coming back.
+  pending-sync-poll-ms: 120000
+  # Weekly recovery pass. NOT the delivery path -- HCC/MODD/MMR/RAF completions trigger a sync
+  # directly and the wf_sync_request outbox covers triggers that land mid-pass. This catches the
+  # things no event can: a deployment whose batches did not run, a tenant that just enabled the
+  # module, and the passage of time (submission windows close on a date, not on an event).
+  # Monday 04:30, after Sunday's 01:00 HCC batch and the RAF flows it chains.
+  recovery-sync-cron: "0 30 4 ? * MON"
+
 global-ticker:
   ticker-name: ras
   batch-size: 50000

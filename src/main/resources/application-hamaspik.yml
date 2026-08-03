@@ -43,3 +43,19 @@ ftp:
   ftp-modd-upload-dir: /mnt/c/ras/ftp/modd
   ftp-mmr-upload-dir: /mnt/c/ras/ftp/mmr
   ftp-sweep-output-dir: /mnt/c/ras/ftp/sweep/output
+
+# ---------------------------------------------------------------------------
+# HCC Coding Workbench (com.fianzahealth.coding).
+#
+# hamaspik is a single-plan install, so H0034 lives in `public` and that is the
+# key that switches it on. Restated here rather than left to inherit the base
+# application.yml: this file is where "what is turned on for hamaspik" is read
+# off, and a module the file does not mention reads as one hamaspik does not
+# have. Every other coding tunable stays on the platform default.
+#
+# Add a second plan to this account and it arrives in its own schema, which this
+# key does not reach -- it stays dark until it is named here.
+# ---------------------------------------------------------------------------
+coding:
+  tenants:
+    public: true

@@ -45,17 +45,12 @@ ftp:
   ftp-sweep-output-dir: /mnt/c/ras/ftp/sweep/output
 
 # ---------------------------------------------------------------------------
-# HCC Coding Workbench (com.fianzahealth.coding).
+# HCC Review workbench (com.fianzahealth.coding).
 #
-# hamaspik is a single-plan install, so H0034 lives in `public` and that is the
-# key that switches it on. Restated here rather than left to inherit the base
-# application.yml: this file is where "what is turned on for hamaspik" is read
-# off, and a module the file does not mention reads as one hamaspik does not
-# have. Every other coding tunable stays on the platform default.
+# Nothing to set here any more. The switch is the CODING_ENABLED row in H0034's
+# h_plan_config (RAPI-1626), seeded on by the coding_enabled_h_plan_config
+# changeset, and every other coding tunable stays on the platform default.
 #
-# Add a second plan to this account and it arrives in its own schema, which this
-# key does not reach -- it stays dark until it is named here.
+# Add a second plan to this account and it arrives with no CODING_ENABLED row of
+# its own -- it stays dark until somebody sets one.
 # ---------------------------------------------------------------------------
-coding:
-  tenants:
-    public: true

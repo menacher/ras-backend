@@ -284,42 +284,31 @@ report:
   stuck-submission-threshold-days: 30
 
 # ---------------------------------------------------------------------------
-# HCC Coding Workbench (com.fianzahealth.coding).
+# HCC Review workbench (com.fianzahealth.coding).
 #
-# Off by DEFAULT, on per tenant. With no override the /coding endpoints 403
-# and no sync ever runs, so the module is inert on installs that have not
-# adopted it; `tenants` below names the ones that have.
+# The on/off switch is NOT here (RAPI-1626). It is the CODING_ENABLED row in
+# the plan's own h_plan_config, read per request by CodingEnablement:
 #
-# The config is only half the switch. A tenant also needs the Cognito groups
-# RAS_CODING / RAS_CODING_ADMIN to exist and be granted -- enabled here without
-# them gets a visible module whose approvals and QA writes all 403.
+#   UPDATE h_plan_config SET value = 'true'
+#    WHERE h_plan_id = (SELECT id FROM public.health_plan WHERE plan_name = 'H0034')
+#      AND key = 'CODING_ENABLED';
+#
+# It moved out of this file because the switch is per-plan and this file is
+# per-pod: turning a plan on used to mean a redeploy, and two replicas reading
+# different config could disagree about whether a plan had a queue. This file
+# used to carry `enabled: true`, so every tenant of the bundled process was on;
+# the coding_enabled_h_plan_config changeset seeds 'true' for every existing
+# plan to match. A plan created afterwards has no row and reads as off.
+#
+# The config was only ever half the switch and still is. A tenant also needs the
+# Cognito groups RAS_CODING / RAS_CODING_ADMIN to exist and be granted -- the row
+# set without them gets a visible module whose approvals and QA writes all 403.
 #
 # Everything below is a tunable. The case state machine deliberately is NOT
 # one: transition legality lives in code so a case's history can never be
 # explained by "that move was legal back in March".
 # ---------------------------------------------------------------------------
 coding:
-  # Deployment default. One install serves several plans, so enabling the module
-  # globally to reach one of them would start building case inventory -- and firing
-  # sync passes on every batch completion -- for plans that never asked for it.
-  enabled: true
-  # Per-tenant overrides, keyed by SCHEMA name (lower case) -- schema IS plan identity here.
-  #
-  # `public` is on: every account's own plan runs in the public schema (hx96x on the default
-  # account, H0034 on hamaspik), so this is how the workbench reaches the plan an install was
-  # built for. Note what that means -- it is a blanket enable for the primary plan of every
-  # deployment that reads this file, not a single pilot. The per-account profiles can still name
-  # additional schemas; application-hamaspik.yml restates `public: true` for the same plan.
-  #
-  # Deliberately NOT `enabled: true`. Add a second plan to an account and it arrives in its OWN
-  # schema (h48869, ...), which no key here reaches -- so the new plan falls back to the
-  # deployment default and stays dark until someone names it. That is the wanted behaviour: an
-  # additional plan starts accruing case inventory when it is asked to, not when it is created.
-  #
-  # An override can only turn a tenant ON. To take `public` back off, this line is the only place
-  # to change -- a profile cannot override it back to false.
-  tenants:
-    public: true
   # Payment years the sync considers, counting back from the current year.
   sync-years-back: 2
   # Also build cases for PY N+1. On by default: next year's payment year accrues

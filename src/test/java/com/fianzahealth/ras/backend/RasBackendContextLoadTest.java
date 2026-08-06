@@ -16,10 +16,18 @@ import org.springframework.test.context.DynamicPropertySource;
 import org.testcontainers.containers.BindMode;
 import org.testcontainers.containers.PostgreSQLContainer;
 
+import org.springframework.web.method.HandlerMethod;
+import org.springframework.web.servlet.mvc.method.RequestMappingInfo;
+import org.springframework.web.servlet.mvc.method.annotation.RequestMappingHandlerMapping;
+
+import java.util.List;
 import java.util.Map;
+import java.util.Set;
+import java.util.TreeSet;
 
 import static com.fianzahealth.ras.jooq.Tables.NOTIFICATION_ALLOWED_DOMAIN;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
  * Boots the full bundled context (ras-api + reconer + x12er + ras-analyzer) against a
@@ -101,6 +109,50 @@ class RasBackendContextLoadTest {
     void jooqRoundTripsThroughMappedGeneratedTable() {
         assertNotNull(dslContext.selectCount().from(NOTIFICATION_ALLOWED_DOMAIN).fetchOne());
     }
+
+    /**
+     * Every peer-module controller must land under its module's URL prefix.
+     *
+     * <p>{@link com.fianzahealth.ras.backend.config.RasBackendWebConfig} re-prefixes by
+     * <em>package name</em>, so a module that adds a controller in a package nobody added to
+     * that predicate is mapped at the context root instead. Standalone ras-api can never see
+     * this — there the prefix comes from {@code server.servlet.context-path} and applies to
+     * every controller — so it surfaces first as a customer-facing 404. That is what happened
+     * on 2026-08-06: the Coding Workbench shipped in {@code com.fianzahealth.coding.controller}
+     * and the whole {@code /ras-api/coding/*} family 404'd in the hamaspik bundle while the
+     * coding sync itself ran normally.
+     */
+    @Test
+    void everyModuleControllerIsMappedUnderItsPrefix() {
+        Set<String> unprefixed = new TreeSet<>();
+        RequestMappingHandlerMapping mapping =
+                context.getBean("requestMappingHandlerMapping", RequestMappingHandlerMapping.class);
+
+        for (Map.Entry<RequestMappingInfo, HandlerMethod> entry : mapping.getHandlerMethods().entrySet()) {
+            String pkg = entry.getValue().getBeanType().getPackageName();
+            if (!pkg.startsWith("com.fianzahealth.") && !pkg.startsWith("com.medvand.")) {
+                continue; // framework, actuator, springdoc
+            }
+            var patterns = entry.getKey().getPathPatternsCondition();
+            if (patterns == null) {
+                continue;
+            }
+            for (String pattern : patterns.getPatternValues()) {
+                if (MODULE_PREFIXES.stream().noneMatch(p -> pattern.startsWith(p + "/"))) {
+                    unprefixed.add(pattern + "  <-  " + entry.getValue().getBeanType().getName());
+                }
+            }
+        }
+
+        assertTrue(unprefixed.isEmpty(),
+                "Controllers mapped outside every module prefix — add their package to "
+                        + "RasBackendWebConfig.configurePathMatch:\n  "
+                        + String.join("\n  ", unprefixed));
+    }
+
+    /** The prefixes RasBackendWebConfig hands out, one per bundled module. */
+    private static final List<String> MODULE_PREFIXES =
+            List.of("/ras-api", "/reconer", "/x12er", "/ras-analyzer");
 
     /** The bundled profile (production default) must wire the in-process peer clients. */
     @Test

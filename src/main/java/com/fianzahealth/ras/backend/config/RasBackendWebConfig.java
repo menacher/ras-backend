@@ -20,17 +20,22 @@ public class RasBackendWebConfig implements WebMvcConfigurer {
 
     @Override
     public void configurePathMatch(PathMatchConfigurer configurer) {
-        // ras-api ships controllers in three sibling packages beyond
+        // ras-api ships controllers in sibling packages beyond
         // com.fianzahealth.rasapi.*: the flow framework
-        // (com.fianzahealth.flow.controller.FlowController) and the MODD
-        // dashboard / upload pair (com.fianzahealth.modd.controller.*).
-        // All three need the /ras-api prefix in bundled mode — in standalone
+        // (com.fianzahealth.flow.controller.FlowController), the MODD
+        // dashboard / upload pair (com.fianzahealth.modd.controller.*) and the
+        // Coding Workbench (com.fianzahealth.coding.controller.*).
+        // All of them need the /ras-api prefix in bundled mode — in standalone
         // ras-api they'd inherit it from server.servlet.context-path=/ras-api.
+        // A package missing from this list is invisible in standalone dev and
+        // 404s only here, so keep it in step with the controller packages in
+        // ras-api (`grep -rl @RestController src/main/java`).
         configurer.addPathPrefix("/ras-api", c -> {
             String pkg = c.getPackageName();
             return pkg.startsWith("com.fianzahealth.rasapi")
                     || pkg.startsWith("com.fianzahealth.flow")
-                    || pkg.startsWith("com.fianzahealth.modd");
+                    || pkg.startsWith("com.fianzahealth.modd")
+                    || pkg.startsWith("com.fianzahealth.coding");
         });
         configurer.addPathPrefix("/reconer",
                 c -> c.getPackageName().startsWith("com.fianzahealth.ras.reconer"));

@@ -112,13 +112,29 @@
             <plugin>
                 <groupId>org.springframework.boot</groupId>
                 <artifactId>spring-boot-maven-plugin</artifactId>
-                <configuration>
-                    <!-- Override parent's classifier=boot config: ras-backend only produces
-                         an executable jar (no separate library variant). -->
-                    <classifier></classifier>
-                </configuration>
+                <!-- The executable jar is target/ras-backend-<version>-boot.jar, the parent's
+                     convention (plain jar = library, -boot = executable). The Dockerfile globs
+                     for *-boot.jar; keep the two in step.
+
+                     This used to override the inherited classifier with an empty
+                     <classifier></classifier> on the theory that ras-backend needs no library
+                     variant. That override is Maven-version dependent and silently shipped a
+                     broken image: Maven 4 reads the empty element as "" and honours it, so the
+                     fat jar replaced the plain jar in place; Maven 3.9 (what ubuntu-latest runs)
+                     reads it as absent and inherits classifier=boot, leaving the plain jar THIN.
+                     The Dockerfile's old target/ras-backend-*.jar then matched both files and
+                     BuildKit took the thin one (last in sort order, '-' 0x2D < '.' 0x2E), so CI
+                     pushed a 28 KB jar with no Main-Class that died on startup, while the same
+                     command on a Maven 4 dev box produced a correct image. Inheriting the
+                     classifier is deterministic across both majors; the unused thin jar is the
+                     price, and it is cheaper than a build that only breaks in CI.
+
+                     id=repackage merges with the execution spring-boot-starter-parent already
+                     declares under that id. Leaving it unset made a SECOND execution ("default"),
+                     so repackage ran twice per build. -->
                 <executions>
                     <execution>
+                        <id>repackage</id>
                         <goals>
                             <goal>build-info</goal>
                             <goal>repackage</goal>

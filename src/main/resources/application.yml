@@ -6,6 +6,11 @@
 # ============================================================================
 authz:
   type: cognito
+  jwks:
+    # outage-tolerance is how long the last known-good key set keeps being served while Cognito
+    # is unreachable — what stops a transient DNS fault rejecting every authenticated request.
+    cache-ttl: 30m
+    outage-tolerance: 6h
   cors:
     allowed-origins: http://localhost:4200, http://localhost:8080, https://edpsdemo.com
     allowed-methods: GET, POST, PUT, PATCH, DELETE, OPTIONS
@@ -39,12 +44,21 @@ logging:
 # chain (AWS_ACCESS_KEY_ID / AWS_SECRET_ACCESS_KEY env), never from properties.
 ras:
   email:
+    phi-enabled: false                                   # Phase-0 guardrail; flip true only when PHI-in-email is approved
     provider: ${EMAIL_PROVIDER:noop}                     # ses | smtp | noop
     from: ${EMAIL_FROM:reports@notifications.confianzatech.com}
     from-display-name: ${EMAIL_FROM_NAME:EDS RAS Platform}
     public-base-url: ${EMAIL_PUBLIC_BASE_URL:}           # portal base for report deep links
     recipient-fallback-enabled: ${EMAIL_RECIPIENT_FALLBACK_ENABLED:false}
     digest-recipients: ${EMAIL_DIGEST_RECIPIENTS:}       # optional bootstrap fallback only
+    tech-team:
+      - subra@confianzatech.com
+      - abraham@confianzatech.com
+    outbox:
+      max-attempts: 5
+      batch-size: 50
+      drain-delay-ms: 60000
+      retention-days: 90
     ses:                                                 # only consulted when provider=ses
       region: ${SES_REGION:us-east-2}
       configuration-set: ${SES_CONFIGURATION_SET:ras-notifications}
@@ -58,6 +72,21 @@ ras:
       enabled: ${EMAIL_DIGESTS_ENABLED:false}
       payment-year: ${EMAIL_DIGEST_PAYMENT_YEAR:}
       model-run: ${EMAIL_DIGEST_MODEL_RUN:INITIAL}
+      show-type: AFTERHCCAPPLIED
+      reconciliation-tolerance: 0.05
+      top-variance-limit: 5
+      # Keep in step with ras-api.scheduling.stuck-report-sweep.days-threshold.
+      stuck-report-threshold-days: 7
+      suppress-unchanged: ${EMAIL_DIGEST_SUPPRESS_UNCHANGED:false}
+      # Heartbeat: an unchanged report still sends this long after its last confirmed delivery,
+      # so a silent channel never becomes indistinguishable from a dead job. Without the
+      # per-cadence map every cadence falls back to resend-after, and a daily digest goes quiet
+      # for a month.
+      resend-after: 30d
+      resend-after-by-cadence:
+        DAILY: 7d
+        WEEKLY: 28d
+        MONTHLY: 90d
 
 server:
   port: 8080
@@ -72,6 +101,15 @@ server:
     protocol_header: x-forwarded-proto
 
 spring:
+  jackson:
+    deserialization:
+      # Jackson 3 defaults this ON, unlike Jackson 2: a @RequestBody record with a primitive
+      # component cannot have that property omitted, and every client here omits the filters it
+      # is not applying. ras-api sets this in its own yml, which this bundle does not load — so
+      # POST /ras-api/coding/members/search 400'd on every first page load until it was set here
+      # too. The DTOs also carry @JsonSetter(nulls = AS_EMPTY) so neither file is load-bearing
+      # alone.
+      fail-on-null-for-primitives: false
   # Multipart settings MUST sit under spring.servlet.multipart, NOT
   # server.servlet.multipart — Spring Boot only reads the `spring.*` path.
   # Defaults are 1MB max-file-size / 10MB max-request-size; without these
@@ -144,6 +182,13 @@ ras-api:
       enabled: false
       cron: "0 30 2 * * *"
       days-threshold: 14
+    # Auto-fails report jobs stranded in h_plan_report.file_status = IN_PROGRESS. MUST stay
+    # ordered after ras.email.digest.daily-cron and share its day mask: the digest reports the
+    # stuck jobs, this sweep then marks them failed so each is reported exactly once.
+    stuck-report-sweep:
+      enabled: false
+      cron: "0 30 7 ? * MON-SAT"
+      days-threshold: 7
   flow:
     # Crash recovery: in_process_flows claims whose owner's heartbeat (60s, per instance) has
     # been silent for this long are released by the reaper. Live workers are never reaped
@@ -151,6 +196,21 @@ ras-api:
     stale-claim-timeout-minutes: 15
   hcc:
     base-pmpm-usd: 1000.00
+  # ui_shared_link rows outlive their own expiry with the state envelope naming the plan,
+  # payment year and filters their sender was looking at (RAPI-1688 / VAPT D-2). The grace
+  # period is deliberate: a link that expired yesterday is the one someone is about to ask
+  # about. 0 disables the purge.
+  ui-shared-link:
+    purge-grace-days: 30
+    purge-cron: "0 40 3 * * *"
+  dashboard:
+    # Separate from ras-api.scheduling.enabled: the cache is per-instance Caffeine, so an
+    # instance that does not own the scheduled refresh still has to warm its own.
+    warm-cache-on-startup: true
+  # MMR payment-reconciliation windows, in complete payment cycles.
+  mmr:
+    payment-stopped-min-absent-months: 2
+    recent-enrollment-min-cycles: 2
 
 # ras-analyzer's half of the bundle-wide scheduling kill-switch (see ras-api.scheduling.enabled).
 ras-analyzer:
